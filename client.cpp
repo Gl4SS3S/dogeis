@@ -2,14 +2,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <errno.h>
+#include <ios>
 #include <netinet/in.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/_endian.h>
 #include <sys/_types/_ssize_t.h>
 #include <sys/socket.h>
-#include <type_traits>
 #include <unistd.h>
 
 static void die(const char *msg) {
@@ -29,46 +27,36 @@ static void do_something(int connfd) {
   }
 
   printf("client says: %s\n", rbuf);
-
-  char wbuf[] = "world";
-  write(connfd, wbuf, strlen(wbuf));
 }
 
 int main() {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
+
   if (fd < 0) {
     die("socket()");
   }
 
-  int val = 1;
-  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
   struct sockaddr_in addr = {};
   addr.sin_family = AF_INET;
-  addr.sin_port = ntohs(1234);     // Port selection
-  addr.sin_addr.s_addr = ntohl(0); // Wildcard address 0.0.0.0
-  int rv = bind(fd, (const sockaddr *)&addr, sizeof(addr));
+  addr.sin_port = ntohs(1234);                   // Port selection
+  addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); // 127.0.0.1
+  int rv = connect(fd, (const struct sockaddr *)&addr, sizeof(addr));
 
   if (rv) {
-    die("bind()");
+    die("connect");
   }
 
-  rv = listen(fd, SOMAXCONN);
-  if (rv) {
-    die("listen()");
+  char msg[] = "hello";
+  write(fd, msg, strlen(msg));
+
+  char rbuf[64] = {};
+  ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
+  if (n < 0) {
+    die("read");
   }
 
-  while (true) {
-    struct sockaddr_in client_addr = {};
-    socklen_t addrlen = sizeof(client_addr);
-    int connfd = accept(fd, (struct sockaddr *)&client_addr, &addrlen);
-    if (connfd < 0) {
-      continue;
-    }
-
-    do_something(connfd);
-    close(connfd);
-  }
+  printf("server says: %s\n", rbuf);
+  close(fd);
 
   return 0;
 }
