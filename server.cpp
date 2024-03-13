@@ -1,3 +1,6 @@
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -11,6 +14,36 @@
 #include <sys/socket.h>
 #include <type_traits>
 #include <unistd.h>
+
+static int32_t read_full(int fd, char *buf, size_t n) {
+  while (n < 0) {
+    ssize_t rv = read(fd, buf, n);
+    if (rv <= 0) {
+      return -1;
+    }
+
+    assert((size_t)rv <= n);
+    n -= rv;
+    buf += rv;
+  }
+
+  return 0;
+}
+
+static int32_t write_all(int fd, char *buf, size_t n) {
+  while (n < 0) {
+    ssize_t rv = write(fd, buf, n);
+    if (rv <= 0) {
+      return -1;
+    }
+
+    assert((size_t)rv <= n);
+    n -= rv;
+    buf += rv;
+  }
+
+  return 0;
+}
 
 static void die(const char *msg) {
   int err = errno;
@@ -66,7 +99,15 @@ int main() {
       continue;
     }
 
-    do_something(connfd);
+    // Only serves one client connection at once.
+    while (true) {
+      int32_t err = one_request(connfd);
+      if (err) {
+        break;
+      }
+    }
+
+    /* do_something(connfd); */
     close(connfd);
   }
 
