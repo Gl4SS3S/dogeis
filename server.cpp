@@ -65,6 +65,32 @@ static int32_t one_request(int connfd) {
 
     return err;
   }
+
+  uint32_t len = 0;
+  memcpy(&len, rbuf, 4);
+  if (len > k_max_msg) {
+    msg("Too long");
+    return -1;
+  }
+
+  // request body
+  err = read_full(connfd, &rbuf[4], len);
+  if (err) {
+    msg("read () error");
+    return err;
+  }
+
+  // do something
+  rbuf[4 + len] = '\0';
+  printf("client says: %s\n", &rbuf[4]);
+
+  // reply using the same protocol
+  const char reply[] = "world";
+  char wbuf[4 + sizeof(reply)];
+  len = (uint32_t)strlen(reply);
+  memcpy(wbuf, &len, 4);
+  memcpy(&wbuf[4], reply, len);
+  return write_all(connfd, wbuf, 4 + len);
 }
 
 // Reques Handling - Abort (Die)
