@@ -126,15 +126,6 @@ int main() {
     die("connect");
   }
 
-  char msg[] = "hello";
-  write(fd, msg, strlen(msg));
-
-  char rbuf[64] = {};
-  ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
-  if (n < 0) {
-    die("read");
-  }
-
   int32_t err = query(fd, "hello1");
   if (err) {
     goto L_DONE;
