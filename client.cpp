@@ -83,7 +83,19 @@ static int32_t query(int fd, const char *text) {
 
   memcpy(&len, rbuf, 4);
   if (len > k_max_msg) {
+    msg("too long");
+    return -1;
   }
+
+  err = read_full(fd, &rbuf[4], len);
+  if (err) {
+    msg("read() error");
+    return err;
+  }
+
+  rbuf[4 + len] = '\0';
+  printf("server says %s\n", &rbuf[4]);
+  return 0;
 }
 
 static void do_something(int connfd) {
@@ -123,7 +135,22 @@ int main() {
     die("read");
   }
 
-  printf("server says: %s\n", rbuf);
+  int32_t err = query(fd, "hello1");
+  if (err) {
+    goto L_DONE;
+  }
+
+  err = query(fd, "hello2");
+  if (err) {
+    goto L_DONE;
+  }
+
+  err = query(fd, "hello3");
+  if (err) {
+    goto L_DONE;
+  }
+
+L_DONE:
   close(fd);
 
   return 0;
