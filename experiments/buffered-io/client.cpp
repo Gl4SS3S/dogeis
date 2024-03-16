@@ -18,9 +18,9 @@
 
 const size_t k_max_msg = 4096;
 
-int io_buffer = BUFFER_SIZE;
-
+int io_buffer = 0;
 char *io_content;
+
 static void die(const char *msg) {
   int err = errno;
   fprintf(stderr, "[%d] %s\n", err, msg);
@@ -110,13 +110,15 @@ static int32_t testing_io_buffer(int fd, const char *text) {
     return -1;
   }
 
-  printf("Is here\n");
-
   char wbuf[4 + k_max_msg + 1];
   memcpy(wbuf, &len, 4);
   memcpy(&wbuf[4], text, len);
   wbuf[4 + k_max_msg] = '\0';
 
+  if (io_buffer < BUFFER_SIZE) {
+
+    io_buffer += 1;
+  }
   /* if (int32_t err = write_all(fd, wbuf, 4 + len)) { */
   /*   return err; */
   /* } */
