@@ -19,7 +19,7 @@
 const size_t k_max_msg = 4096;
 
 int io_buffer = 0;
-char *io_content;
+char io_content[BUFFER_SIZE][4 + k_max_msg + 1];
 
 static void die(const char *msg) {
   int err = errno;
@@ -116,9 +116,11 @@ static int32_t testing_io_buffer(int fd, const char *text) {
   wbuf[4 + k_max_msg] = '\0';
 
   if (io_buffer < BUFFER_SIZE) {
+    strcpy(io_content[io_buffer], wbuf);
 
     io_buffer += 1;
   }
+
   /* if (int32_t err = write_all(fd, wbuf, 4 + len)) { */
   /*   return err; */
   /* } */
@@ -173,12 +175,6 @@ int main() {
     die("socket()");
   }
 
-  io_content = (char *)malloc((BUFFER_SIZE) * sizeof(char[4 + k_max_msg + 1]));
-
-  if (io_content == NULL) {
-    die("Malloc Failed");
-  }
-
   struct sockaddr_in addr = {};
   addr.sin_family = AF_INET;
   addr.sin_port = ntohs(1234);                   // Port selection
@@ -189,7 +185,10 @@ int main() {
     die("connect");
   }
 
+  int32_t test3 = testing_io_buffer(fd, "testing");
   int32_t test = testing_io_buffer(fd, "testing");
+  int32_t test2 = testing_io_buffer(fd, "testing");
+  int32_t test1 = testing_io_buffer(fd, "testing");
 
   int32_t err = query(fd, "hello1");
   if (err) {
