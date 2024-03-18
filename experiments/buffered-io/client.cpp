@@ -19,7 +19,7 @@
 const size_t k_max_msg = 4096;
 
 int io_buffer = 0;
-char io_content[BUFFER_SIZE][4 + k_max_msg + 1];
+char io_content[BUFFER_SIZE][4 + k_max_msg];
 
 static void die(const char *msg) {
   int err = errno;
@@ -116,9 +116,16 @@ static int32_t testing_io_buffer(int fd, const char *text) {
   wbuf[4 + k_max_msg] = '\0';
 
   if (io_buffer < BUFFER_SIZE) {
-    strcpy(io_content[io_buffer], wbuf);
+    memcpy(io_content[io_buffer], wbuf, sizeof(wbuf));
 
     io_buffer += 1;
+  } else {
+
+    printf("IO content: %s\n", io_content[0]);
+
+    write_all(fd, io_content[0], 4 + len);
+    write_all(fd, io_content[1], 4 + len);
+    write_all(fd, io_content[2], 4 + len);
   }
 
   /* if (int32_t err = write_all(fd, wbuf, 4 + len)) { */

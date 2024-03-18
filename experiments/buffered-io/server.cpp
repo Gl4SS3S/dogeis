@@ -68,6 +68,9 @@ static int32_t one_request(int connfd) {
 
   uint32_t len = 0;
   memcpy(&len, rbuf, 4);
+
+  printf("Message Length: %u\n", len);
+
   if (len > k_max_msg) {
     msg("Too long");
     return -1;
