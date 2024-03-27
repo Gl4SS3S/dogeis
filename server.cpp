@@ -6,22 +6,63 @@
 #include <cstdlib>
 #include <cstring>
 #include <errno.h>
+#include <fcntl.h>
+#include <filesystem>
 #include <netinet/in.h>
-#include <stdarg.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/_endian.h>
 #include <sys/_types/_ssize_t.h>
 #include <sys/socket.h>
-#include <type_traits>
 #include <unistd.h>
+#include <vector>
+
 #define BUFFER_SIZE 3
 
 const size_t k_max_msg = 4096;
 
+enum { STATE_REQ = 0, STATE_RES = 1, STATE_END = 2 };
+
+struct Conn {
+  int fd = -1;
+  uint32_t state = 0;
+
+  // Buffer for reading
+  size_t rbuf_size = 0;
+  uint8_t rbuf[4 + k_max_msg];
+
+  // Buffer for writing
+  size_t wbuf_size = 0;
+  size_t wbuf_sent = 0;
+  uint8_t wbuf[4 + k_max_msg];
+};
+
 static void msg(const char *msg) { fprintf(stderr, "%s\n", msg); }
 
-// Read Request Bytes from the incoming request on the socket
+static void die(const char *msg) {
+  int err = errno;
+  fprintf(stderr, "[%d] %s\n", err, msg);
+  abort();
+}
+
+static void fd_set_nb(int fd) {
+  errno = 0;
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (errno) {
+    die("fcntl error");
+    return;
+  }
+
+  flags |= O_NONBLOCK;
+
+  errno = 0;
+  (void)fcntl(fd, F_SETFL, flags);
+
+  if (errno) {
+    die("fcntl error");
+  }
+}
 
 static int32_t read_full(int fd, char *buf, size_t n) {
   while (n > 0) {
@@ -94,14 +135,6 @@ static int32_t one_request(int connfd) {
   return write_all(connfd, wbuf, 4 + len);
 }
 
-// Reques Handling - Abort (Die)
-
-static void die(const char *msg) {
-  int err = errno;
-  fprintf(stderr, "[%d] %s\n", err, msg);
-  abort();
-}
-
 static void do_something(int connfd) {
   char rbuf[64] = {};
   ssize_t n = read(connfd, rbuf, sizeof(rbuf) - 1);
@@ -140,24 +173,24 @@ int main() {
     die("listen()");
   }
 
-  while (true) {
-    struct sockaddr_in client_addr = {};
-    socklen_t addrlen = sizeof(client_addr);
-    int connfd = accept(fd, (struct sockaddr *)&client_addr, &addrlen);
-    if (connfd < 0) {
-      continue;
-    }
+  std::vector<Conn *> fd2conn;
 
-    // Only serves one client connection at once.
-    while (true) {
-      int32_t err = one_request(connfd);
-      if (err) {
-        break;
+  fd_set_nb(fd);
+
+  std::vector<struct pollfd> poll_args;
+
+  while (true) {
+    // Prepare Arguments of the poll
+    poll_args.clear();
+
+    struct pollfd pfd = {fd, POLLIN, 0};
+    poll_args.push_back(pfd);
+
+    for (Conn *conn : fd2conn) {
+      if (!conn) {
+        continue;
       }
     }
-
-    /* do_something(connfd); */
-    close(connfd);
   }
 
   return 0;
