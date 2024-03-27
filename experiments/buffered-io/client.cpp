@@ -121,11 +121,15 @@ static int32_t testing_io_buffer(int fd, const char *text) {
     io_buffer += 1;
   } else {
 
-    printf("IO content: %s\n", io_content[0]);
+    char result[BUFFER_SIZE * (4 + k_max_msg)];
 
-    write_all(fd, io_content[0], 4 + len);
-    write_all(fd, io_content[1], 4 + len);
-    write_all(fd, io_content[2], 4 + len);
+    memcpy(result, io_content[0], sizeof(io_content[0]));
+    memcpy(&result[(4 + k_max_msg) * 1], io_content[1], sizeof(io_content[0]));
+    memcpy(&result[(4 + k_max_msg) * 2], io_content[2], sizeof(io_content[0]));
+
+    write_all(fd, result, (4 + len) * BUFFER_SIZE);
+    /*   write_all(fd, io_content[1], 4 + len); */
+    /*   write_all(fd, io_content[2], 4 + len); */
   }
 
   /* if (int32_t err = write_all(fd, wbuf, 4 + len)) { */

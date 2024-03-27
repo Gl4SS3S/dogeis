@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <type_traits>
 #include <unistd.h>
+#define BUFFER_SIZE 3
 
 const size_t k_max_msg = 4096;
 
