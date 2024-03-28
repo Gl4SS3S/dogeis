@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <sys/_endian.h>
 #include <sys/_types/_ssize_t.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
@@ -149,6 +150,51 @@ static void do_something(int connfd) {
   write(connfd, wbuf, strlen(wbuf));
 }
 
+static void connection_io(Conn *conn) {
+  if (conn->state == STATE_END) {
+    state_req(conn);
+  } else if (conn->state == STATE_RES) {
+    state_res(conn);
+  } else {
+    assert(0);
+  }
+}
+
+static void conn_put(std::vector<Conn *> &fd2conn, struct Conn *conn) {
+  if (fd2conn.size() <= (size_t)conn->fd) {
+    fd2conn.resize(conn->fd + 1);
+  }
+
+  fd2conn[conn->fd] = conn;
+}
+
+static int32_t accept_new_conn(std::vector<Conn *> &fd2conn, int fd) {
+  // accept
+  struct sockaddr_in client_addr = {};
+
+  socklen_t socklen = sizeof(client_addr);
+  int connfd = accept(fd, (struct sockaddr *)&client_addr, &socklen);
+  if (connfd < 0) {
+    msg("accept() error");
+    return -1;
+  }
+
+  fd_set_nb(connfd);
+  struct Conn *conn = (struct Conn *)malloc(sizeof(struct Conn));
+  if (!conn) {
+    close(connfd);
+    return -1;
+  }
+
+  conn->fd = connfd;
+  conn->state = STATE_REQ;
+  conn->rbuf_size = 0;
+  conn->wbuf_size = 0;
+  conn->wbuf_sent = 0;
+  conn_put(fd2conn, conn);
+  return 0;
+}
+
 int main() {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
@@ -190,6 +236,35 @@ int main() {
       if (!conn) {
         continue;
       }
+
+      struct pollfd pfd = {};
+      pfd.fd = conn->fd;
+      pfd.events = (conn->state == STATE_REQ) ? POLLIN : 0;
+      pfd.events = pfd.events | POLLERR;
+      poll_args.push_back(pfd);
+    }
+
+    // Poll for active fds
+    int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), 1000);
+    if (rv < 0) {
+      die("poll");
+    }
+
+    for (size_t i = 1; i < poll_args.size(); i++) {
+      if (poll_args[i].revents) {
+        Conn *conn = fd2conn[poll_args[i].fd];
+        connection_io(conn);
+        if (conn->state == STATE_END) {
+          // Client Closed - Kill connection
+          fd2conn[conn->fd] = NULL;
+          (void)close(conn->fd);
+          free(conn);
+        }
+      }
+    }
+
+    if (poll_args[0].revents) {
+      (void)accept_new_conn(fd2conn, fd);
     }
   }
 
